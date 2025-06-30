@@ -6,10 +6,6 @@ CREATE DATABASE IF NOT EXISTS shedlock_demo
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
--- Grant privileges to the application user
-GRANT ALL PRIVILEGES ON shedlock_demo.* TO 'shedlock_user'@'%';
-GRANT ALL PRIVILEGES ON shedlock_demo.* TO 'shedlock_user'@'localhost';
-
 -- Flush privileges to apply changes
 FLUSH PRIVILEGES;
 

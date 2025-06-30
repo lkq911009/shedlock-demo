@@ -1,5 +1,5 @@
 # Multi-stage build for Spring Boot application
-FROM maven:3.9.5-openjdk-17 AS build
+FROM maven:3.9.5-eclipse-temurin-17 AS build
 
 # Set working directory
 WORKDIR /app
@@ -7,17 +7,24 @@ WORKDIR /app
 # Copy pom.xml first for better layer caching
 COPY pom.xml .
 
-# Download dependencies
-RUN mvn dependency:go-offline -B
+# Download dependencies with retry
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn dependency:go-offline -B || \
+    (sleep 5 && mvn dependency:go-offline -B) || \
+    (sleep 10 && mvn dependency:go-offline -B)
 
 # Copy source code
 COPY src ./src
 
 # Build the application
-RUN mvn clean package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn clean package -DskipTests
 
 # Runtime stage
-FROM openjdk:17-jre-slim
+FROM eclipse-temurin:17-jre
+
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
