@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: shedlock-demo
+  
+  # Database Configuration
+  datasource:
+    # H2 Configuration (default for development)
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+    
+    # PostgreSQL Configuration (uncomment to use PostgreSQL)
+    # url: jdbc:postgresql://localhost:5432/shedlock_demo
+    # driver-class-name: org.postgresql.Driver
+    # username: postgres
+    # password: password
+  
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+        # For PostgreSQL, use: org.hibernate.dialect.PostgreSQLDialect
+  
+  # Liquibase Configuration
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: true
+  
+  # H2 Console (for development)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+# Logging Configuration
+logging:
+  level:
+    com.example.shedlockdemo: DEBUG
+    net.javacrumbs.shedlock: DEBUG
+    org.springframework.scheduling: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# Server Configuration
+server:
+  port: 8080
+
+# ShedLock Configuration
+shedlock:
+  defaults:
+    lock-at-most-for: 30m
+    lock-at-least-for: 1m 
