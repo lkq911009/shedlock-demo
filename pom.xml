@@ -40,6 +40,12 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
 
+        <!-- Spring Boot Actuator for health checks -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- ShedLock -->
         <dependency>
             <groupId>net.javacrumbs.shedlock</groupId>
@@ -69,6 +75,14 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- MySQL Driver -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.33</version>
             <scope>runtime</scope>
         </dependency>
 

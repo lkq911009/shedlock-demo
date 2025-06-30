@@ -11,9 +11,10 @@ This application runs a scheduled job at 11:30 PM EST, Monday to Friday, that ma
 - **Distributed Safety**: Uses ShedLock with JDBC to ensure only one instance runs the job
 - **Scheduled Execution**: Runs at 11:30 PM EST, Monday to Friday only
 - **Idempotency**: Checks if EOD is already marked before updating
-- **Database Support**: Configurable for H2 (development) or PostgreSQL (production)
+- **Database Support**: Configurable for H2 (development) or PostgreSQL/MySQL (production)
 - **Database Migration**: Uses Liquibase for schema management
 - **REST API**: Optional endpoint to check EOD status
+- **Docker Support**: Multi-instance setup with MySQL database
 
 ## Technology Stack
 
@@ -21,50 +22,64 @@ This application runs a scheduled job at 11:30 PM EST, Monday to Friday, that ma
 - Java 17
 - ShedLock 5.10.2 (with JDBC provider)
 - Liquibase for database migrations
-- H2 Database (development) / PostgreSQL (production)
+- H2 Database (development) / PostgreSQL/MySQL (production)
 - Spring Data JPA
 - Spring Scheduling
+- Docker & Docker Compose
 
-## Project Structure
+## Quick Start with Docker (Recommended)
 
-```
-src/
-├── main/
-│   ├── java/com/example/shedlockdemo/
-│   │   ├── ShedLockDemoApplication.java    # Main application class
-│   │   ├── controller/
-│   │   │   └── EODController.java          # REST controller
-│   │   ├── entity/
-│   │   │   └── DailyReportStatus.java      # JPA entity
-│   │   ├── repository/
-│   │   │   └── DailyReportStatusRepository.java # Repository interface
-│   │   ├── scheduler/
-│   │   │   └── EODScheduler.java           # Scheduled job
-│   │   └── service/
-│   │       └── EODService.java             # Business logic
-│   └── resources/
-│       ├── application.yml                 # Configuration
-│       └── db/changelog/                   # Liquibase changelogs
-│           ├── db.changelog-master.xml
-│           └── changes/
-│               ├── 001-create-daily-report-status-table.xml
-│               └── 002-create-shedlock-table.xml
+### Prerequisites
+- Docker Desktop installed and running
+- Git
+
+### 1. Clone and Start
+```bash
+# Clone the repository
+git clone git@github.com:lkq911009/shedlock-demo.git
+cd shedlock-demo
+
+# Start all services (MySQL + 3 Spring Boot instances)
+./docker-start.sh
 ```
 
-## Database Schema
+### 2. Verify Setup
+The script will show you all the URLs:
+- **Instance 1**: http://localhost:8080
+- **Instance 2**: http://localhost:8081  
+- **Instance 3**: http://localhost:8082
+- **MySQL**: localhost:3306
 
-### daily_report_status Table
-- `business_date` (DATE, primary key) - The business date
-- `status_flag` (VARCHAR) - Status flag (e.g., "EOD")
-- `updated_at` (TIMESTAMP) - Last update timestamp
+### 3. Test the Application
+```bash
+# Check EOD status on different instances
+curl http://localhost:8080/eod/status
+curl http://localhost:8081/eod/status
+curl http://localhost:8082/eod/status
 
-### shedlock Table (ShedLock requirement)
-- `name` (VARCHAR(64), primary key) - Lock name
-- `lock_until` (TIMESTAMP) - Lock expiration time
-- `locked_at` (TIMESTAMP) - Lock acquisition time
-- `locked_by` (VARCHAR(255)) - Instance that acquired the lock
+# Check health status
+curl http://localhost:8080/actuator/health
+```
 
-## Setup and Running
+### 4. Docker Management
+```bash
+# View logs
+./docker-start.sh logs
+
+# Check status
+./docker-start.sh status
+
+# Stop services
+./docker-start.sh stop
+
+# Restart services
+./docker-start.sh restart
+
+# Clean up everything
+./docker-start.sh cleanup
+```
+
+## Manual Setup (Development)
 
 ### Prerequisites
 - Java 17 or higher
@@ -107,6 +122,23 @@ src/
    mvn spring-boot:run
    ```
 
+## Docker Architecture
+
+### Services
+- **MySQL 8.0**: Database server with persistent storage
+- **Spring Boot Instance 1**: Port 8080
+- **Spring Boot Instance 2**: Port 8081  
+- **Spring Boot Instance 3**: Port 8082
+
+### Network
+- All services run on a custom Docker network
+- MySQL is accessible only within the Docker network
+- Application instances can communicate with each other
+
+### Data Persistence
+- MySQL data is persisted in a Docker volume
+- Application logs are available via `docker-compose logs`
+
 ## API Endpoints
 
 ### Check EOD Status
@@ -125,6 +157,11 @@ Response:
 }
 ```
 
+### Health Check
+```
+GET /actuator/health
+```
+
 ## Scheduled Job Details
 
 - **Schedule**: 11:30 PM EST, Monday to Friday
@@ -135,36 +172,51 @@ Response:
 
 ## Testing the Application
 
+### Docker Testing
+```bash
+# Start the multi-instance setup
+./docker-start.sh
+
+# Test distributed locking by checking logs
+docker-compose logs -f shedlock-app-1
+docker-compose logs -f shedlock-app-2
+docker-compose logs -f shedlock-app-3
+
+# You'll see that only one instance acquires the lock
+```
+
 ### Manual Testing
+```bash
+# Check EOD status
+curl http://localhost:8080/eod/status
 
-1. Start the application
-2. Check the current status:
-   ```bash
-   curl http://localhost:8080/eod/status
-   ```
+# For testing the scheduled job, modify the cron expression temporarily:
+# In EODScheduler.java, change to: @Scheduled(cron = "0 */1 * * * *")
+```
 
-3. For testing the scheduled job, you can temporarily modify the cron expression in `EODScheduler.java` to run more frequently:
-   ```java
-   @Scheduled(cron = "0 */1 * * * *", zone = "America/New_York") // Every minute
-   ```
+## Database Schema
 
-### H2 Console (Development)
+### daily_report_status Table
+- `business_date` (DATE, primary key) - The business date
+- `status_flag` (VARCHAR) - Status flag (e.g., "EOD")
+- `updated_at` (TIMESTAMP) - Last update timestamp
 
-Access the H2 console at `http://localhost:8080/h2-console` with:
-- JDBC URL: `jdbc:h2:mem:testdb`
-- Username: `sa`
-- Password: (empty)
-
-## Distributed Deployment
-
-To run multiple instances:
-
-1. Ensure all instances point to the same database
-2. Each instance will attempt to acquire the lock
-3. Only one instance will successfully execute the job
-4. Other instances will skip execution
+### shedlock Table (ShedLock requirement)
+- `name` (VARCHAR(64), primary key) - Lock name
+- `lock_until` (TIMESTAMP) - Lock expiration time
+- `locked_at` (TIMESTAMP) - Lock acquisition time
+- `locked_by` (VARCHAR(255)) - Instance that acquired the lock
 
 ## Configuration Options
+
+### Docker Environment Variables
+```yaml
+SPRING_PROFILES_ACTIVE: docker
+SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/shedlock_demo
+SPRING_DATASOURCE_USERNAME: shedlock_user
+SPRING_DATASOURCE_PASSWORD: shedlock_pass
+SERVER_PORT: 8080
+```
 
 ### ShedLock Configuration
 ```yaml
@@ -174,29 +226,50 @@ shedlock:
     lock-at-least-for: 1m    # Minimum lock duration
 ```
 
-### Logging Configuration
-```yaml
-logging:
-  level:
-    com.example.shedlockdemo: DEBUG
-    net.javacrumbs.shedlock: DEBUG
-```
-
 ## Troubleshooting
 
-### Common Issues
+### Common Docker Issues
+1. **Port conflicts**: Make sure ports 8080-8082 and 3306 are available
+2. **Docker not running**: Start Docker Desktop first
+3. **Build failures**: Check Docker logs with `docker-compose logs`
 
-1. **Job not running**: Check if the current time is within the scheduled window (11:30 PM EST, Mon-Fri)
-2. **Database connection issues**: Verify database configuration in `application.yml`
-3. **Lock acquisition failures**: Check if another instance is already running the job
+### Common Application Issues
+1. **Database connection**: Ensure MySQL is healthy before starting apps
+2. **Lock acquisition**: Check ShedLock logs for lock conflicts
+3. **Scheduling**: Verify timezone settings
 
-### Logs
+### Logs and Debugging
+```bash
+# View all logs
+docker-compose logs
 
-The application provides detailed logging for:
-- ShedLock operations
-- Scheduled job execution
-- Database operations
-- EOD status changes
+# View specific service logs
+docker-compose logs shedlock-app-1
+docker-compose logs mysql
+
+# Follow logs in real-time
+docker-compose logs -f
+```
+
+## Benefits of This Implementation
+
+1. **Distributed Safety**: Multiple instances can run without conflicts
+2. **Fault Tolerance**: Failed jobs don't prevent future executions
+3. **Idempotency**: Safe to run multiple times
+4. **Timezone Awareness**: Proper EST/EDT handling
+5. **Database Migration**: Version-controlled schema changes
+6. **Monitoring**: REST endpoint for status checking
+7. **Docker Ready**: Easy deployment with Docker Compose
+8. **Scalability**: Easy to add more instances
+
+## Future Enhancements
+
+1. **Metrics**: Add Micrometer for job execution metrics
+2. **Alerting**: Integrate with monitoring systems
+3. **Retry Logic**: Add retry mechanism for failed jobs
+4. **Audit Trail**: Enhanced logging for compliance
+5. **Configuration**: External configuration for cron expression
+6. **Kubernetes**: Add Kubernetes deployment manifests
 
 ## License
 
